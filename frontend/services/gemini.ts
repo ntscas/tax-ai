@@ -37,7 +37,7 @@ export const generateLegalResponse = async (
   try {
     // 1. 모델 설정 (Gemini 2.5 Flash 및 Google Search Grounding 도구 적용)
     const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-2.0-flash',
       systemInstruction: systemInstruction,
       tools: [{ googleSearch: {} } as any], // 구글 검색 라이브 연동
     });
