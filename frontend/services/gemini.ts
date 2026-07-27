@@ -1,8 +1,8 @@
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// Initialize the Gemini client.
-// The API key is expected to be provided by the environment.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY, vertexai: true });
+// process.env.API_KEY는 GitHub Actions 빌드 시 주입되거나 vite.config.ts를 통해 주입됩니다.
+const apiKey = process.env.API_KEY || '';
+const genAI = new GoogleGenerativeAI(apiKey);
 
 export type AgentMode = 'qa' | 'opinion';
 
@@ -15,7 +15,7 @@ export const generateLegalResponse = async (
   query: string,
   mode: AgentMode
 ): Promise<AgentResponse> => {
-  // Define system instructions based on the selected mode.
+  // 프롬프트 및 시스템 지침 설정
   const systemInstruction =
     mode === 'qa'
       ? `당신은 'ntis-tax-kr' 조세 데이터베이스, 국세청 국세법령정보시스템, 그리고 법제처(law.go.kr) 법령 정보에 정통한 AI 조세/법률 전문가입니다.
@@ -35,39 +35,49 @@ export const generateLegalResponse = async (
 전문적이고 논리적인 법률 문장으로 작성하며, 마크다운 형식을 사용하여 가독성을 높이세요.`;
 
   try {
-    const response = await ai.models.generateContent({
+    // 1. 모델 설정 (Gemini 2.5 Flash 및 Google Search Grounding 도구 적용)
+    const model = genAI.getGenerativeModel({
       model: 'gemini-2.5-flash',
-      contents: query,
-      config: {
-        systemInstruction,
-        // Enable Google Search grounding to fetch up-to-date legal info
-        tools: [{ googleSearch: {} }],
-        temperature: 0.2, // Lower temperature for more factual/deterministic legal responses
+      systemInstruction: systemInstruction,
+      tools: [{ googleSearch: {} } as any], // 구글 검색 라이브 연동
+    });
+
+    // 2. 콘텐츠 생성 요청 (낮은 temperature 설정)
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: query }] }],
+      generationConfig: {
+        temperature: 0.2,
       },
     });
 
-    const text = response.text || '답변을 생성하지 못했습니다.';
-    
-    // Extract grounding chunks (URLs) if available
-    const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-    
+    const response = await result.response;
+    const text = response.text() || '답변을 생성하지 못했습니다.';
+
+    // 3. Grounding 메타데이터(출처 URL) 추출
+    const responseData = response as any;
+    const groundingChunks =
+      responseData.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+
     const sources = groundingChunks
-      .map(chunk => {
+      .map((chunk: any) => {
         if (chunk.web?.uri) {
           return { uri: chunk.web.uri, title: chunk.web.title };
         }
         return null;
       })
-      .filter((source): source is { uri: string; title?: string } => source !== null);
+      .filter(
+        (source: { uri: string; title?: string } | null): source is { uri: string; title?: string } =>
+          source !== null
+      );
 
-    // Deduplicate sources based on URI
+    // 중복 URL 제거
     const uniqueSources = Array.from(
-      new Map(sources.map(item => [item.uri, item])).values()
+      new Map(sources.map((item) => [item.uri, item])).values()
     );
 
     return { text, sources: uniqueSources };
   } catch (error) {
-    console.error("Error generating response:", error);
-    throw new Error("AI 응답을 생성하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
+    console.error('Error generating response:', error);
+    throw new Error('AI 응답을 생성하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
   }
 };
