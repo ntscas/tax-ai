@@ -1,0 +1,4 @@
+{
+  "name": "Tax & Legal AI Agent",
+  "description": "An AI agent that answers tax/legal questions and drafts legal opinions using Gemini and Google Search grounding."
+}
