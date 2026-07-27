@@ -8,10 +8,7 @@
     "dev-frontend": "npm run dev --prefix frontend",
     "dev-backend": "npm run dev --prefix backend",
     "dev": "concurrently \"npm run dev-frontend\" \"npm run dev-backend\"",
-    
-    // 👇 아래처럼 build 스크립트를 추가해 주세요.
-    "build": "npm run build --prefix frontend" 
-    // 만약 백엔드도 빌드가 필요하다면: "npm run build --prefix frontend && npm run build --prefix backend"
+    "build": "npm run build --prefix frontend"
   },
   "devDependencies": {
     "concurrently": "latest"
