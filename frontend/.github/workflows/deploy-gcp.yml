@@ -1,0 +1,45 @@
+name: Deploy to GCP Cloud Storage
+
+on:
+  # 기본적으로 비활성화되어 있습니다. 사용하려면 아래 주석을 해제하세요.
+  # push:
+  #   branches:
+  #     - main
+  workflow_dispatch:
+
+jobs:
+  deploy-to-gcp:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Inject API Key from Secrets
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "Error: GEMINI_API_KEY secret is not set."
+            exit 1
+          fi
+          sed -i "s|process.env.API_KEY|'$GEMINI_API_KEY'|g" services/gemini.ts
+
+      # GCP 인증 (Service Account Key 방식)
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: '${{ secrets.GCP_PROJECT_ID }}'
+
+      # 빌드된(또는 준비된) 정적 파일들을 GCP 버킷으로 동기화
+      - name: Upload to Cloud Storage
+        run: |
+          # .git 폴더와 github 워크플로우 폴더를 제외하고 업로드합니다.
+          gcloud storage rsync . gs://${{ secrets.GCP_BUCKET_NAME }} --recursive --exclude="^\.git/.*$|^\.github/.*$"
+          
+          # 모든 파일에 대해 공개 읽기 권한 부여 (정적 웹사이트 호스팅용)
+          gcloud storage objects update gs://${{ secrets.GCP_BUCKET_NAME }}/** --add-acl-grant=entity=allUsers,role=READER
