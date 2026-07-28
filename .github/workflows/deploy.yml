@@ -13,7 +13,7 @@ permissions:
 
 concurrency:
   group: "pages"
-  cancel-in-progress: true # 이전 실행 중인 배포를 취소하여 중복 실행 방지
+  cancel-in-progress: true
 
 jobs:
   build-and-deploy:
@@ -28,28 +28,20 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22' # Node 20 경고 해결을 위해 22(또는 24)로 변경
-
-      - name: Inject API Key from Secrets
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: |
-          if [ -z "$GEMINI_API_KEY" ]; then
-            echo "Error: GEMINI_API_KEY secret is not set."
-            exit 1
-          fi
-          sed -i "s/process.env.API_KEY/'$GEMINI_API_KEY'/g" frontend/services/gemini.ts
+          node-version: '22'
 
       - name: Install dependencies
         run: npm install --prefix frontend
 
+      # Vite 환경변수(VITE_GEMINI_API_KEY)로 주입하여 안전하게 빌드
       - name: Build frontend
+        env:
+          VITE_GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: npm run build --prefix frontend
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
-      # 🎯 단 한 번만 artifact를 업로드해야 합니다.
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
