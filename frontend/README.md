@@ -1,32 +1,46 @@
 # Tax & Legal AI Agent
 
-## GitHub Pages 및 GitHub Actions 배포 가이드 (`deploy.yml` 활용)
+## 🚀 주요 기능: GCP 버킷(ntis-tax-kr) 연동
+이 애플리케이션은 사용자가 입력한 **GCP Cloud Storage 버킷 URI (`gs://...`)**의 파일을 직접 읽어와 판례 및 유권해석 상호 검증에 활용합니다.
+- UI 좌측의 **'GCP 버킷 데이터 연동'** 입력란에 분석하고자 하는 파일의 경로(예: `gs://ntis-tax-kr/tax_data.pdf`)를 입력하면, Gemini 모델이 해당 파일을 직접 참조하여 답변을 생성합니다.
 
-이 프로젝트는 별도의 빌드 도구 없이 브라우저에서 직접 실행되는 React 애플리케이션입니다. 제공된 `.github/workflows/deploy.yml` 파일을 통해 소스 코드에 API 키를 하드코딩하지 않고도 안전하게 GitHub Pages에 배포할 수 있습니다.
+---
 
-### ⚠️ 보안 경고 (매우 중요)
-GitHub Secrets를 통해 빌드 시점에 API 키를 주입하더라도, **최종적으로 배포된 웹사이트는 프론트엔드(클라이언트 사이드) 애플리케이션이므로 브라우저 개발자 도구를 통해 누구나 API 키를 볼 수 있습니다.** 
-실제 상용 서비스로 운영할 경우, 반드시 백엔드 서버를 구축하여 API 호출을 중계해야 합니다. 본 배포 방식은 개인적인 테스트 및 포트폴리오 용도로만 사용하시기 바랍니다.
+## ⚠️ 깃허브 배포 시 API 오류 해결 가이드 (필독)
 
-### 배포 설정 단계
+GitHub에 코드를 올린 후 웹사이트에서 **"API 오류"**가 발생하는 경우, 다음 세 가지 원인 중 하나입니다.
 
-#### 1. GitHub Secrets에 API 키 등록
-소스 코드에 키를 직접 적지 않기 위해 GitHub의 보안 변수(Secrets) 기능을 사용합니다.
-1. GitHub 저장소(Repository) 페이지로 이동합니다.
-2. 상단 탭에서 **Settings**를 클릭합니다.
-3. 좌측 메뉴에서 **Secrets and variables** > **Actions**를 클릭합니다.
-4. **New repository secret** 버튼을 클릭합니다.
-5. **Name**에 `GEMINI_API_KEY`를 입력합니다.
-6. **Secret**에 발급받은 Google Gemini API 키 값을 입력하고 **Add secret**을 누릅니다.
+### 1. `process is not defined` 오류 (가장 흔함)
+- **원인**: 소스 코드에 API 키를 직접 적지 않기 위해 `process.env.API_KEY`를 사용하는데, GitHub에 파일을 **수동으로 업로드(Drag & Drop)**하면 이 변수가 실제 키로 치환되지 않아 브라우저에서 오류가 발생합니다.
+- **해결 방법**: 반드시 아래의 **[GitHub Actions 배포 가이드]**를 따라 `deploy.yml` 워크플로우를 통해 배포해야 합니다. 워크플로우가 실행되면서 자동으로 키를 주입해 줍니다.
 
-#### 2. GitHub Pages 설정 변경
-1. 저장소의 **Settings** > **Pages** 메뉴로 이동합니다.
-2. **Build and deployment** 섹션에서 **Source**를 `GitHub Actions`로 변경합니다.
+### 2. 400 / 403 권한 오류 (Vertex AI API 키 문제)
+- **원인**: 본 프로젝트는 GCP 환경에 맞게 `vertexai: true` 옵션을 사용합니다. 따라서 일반적인 Google AI Studio API 키를 넣으면 권한 오류가 발생합니다.
+- **해결 방법**: Google Cloud Console(GCP)에 접속하여 **[API 및 서비스] > [사용자 인증 정보]**에서 생성한 **Vertex AI API 키**를 GitHub Secrets에 등록해야 합니다.
 
-#### 3. 코드 푸시 및 자동 배포
-1. `.github/workflows/deploy.yml` 파일을 포함한 모든 코드를 `main` 브랜치에 커밋하고 푸시(Push)합니다.
-2. GitHub 저장소의 **Actions** 탭으로 이동하면 `Deploy to GitHub Pages` 워크플로우가 자동으로 실행되는 것을 볼 수 있습니다.
-3. 배포가 완료되면 제공되는 `https://<username>.github.io/<repository-name>` 링크를 통해 서비스에 접속할 수 있습니다.
+### 3. GCP 버킷 파일 접근 오류 (404 / 403)
+- **원인**: UI에 입력한 `gs://ntis-tax-kr/...` 파일이 실제로 존재하지 않거나, 사용 중인 API 키에 해당 버킷을 읽을 권한이 없는 경우입니다.
+- **해결 방법**: 실제 존재하는 파일 경로를 입력하고, GCP IAM 설정에서 권한을 확인하세요.
 
-### 작동 원리
-`deploy.yml` 워크플로우는 코드를 체크아웃한 뒤, `sed` 명령어를 사용하여 `services/gemini.ts` 파일 내에 있는 `process.env.API_KEY` 문자열을 GitHub Secrets에 저장된 실제 API 키로 치환합니다. 이후 치환된 파일들을 GitHub Pages 서버로 업로드하여 서비스합니다.
+---
+
+## 📦 배포 가이드 1: GitHub Pages (GitHub Actions 활용)
+
+1. GitHub 저장소의 **Settings > Secrets and variables > Actions**로 이동합니다.
+2. **New repository secret**을 클릭하고, Name에 `GEMINI_API_KEY`, Secret에 **GCP Vertex AI API 키**를 입력합니다.
+3. **Settings > Pages**에서 **Source**를 `GitHub Actions`로 변경합니다.
+4. 코드를 `main` 브랜치에 Push하면 자동으로 배포가 진행됩니다.
+
+---
+
+## 📦 배포 가이드 2: GCP Cloud Storage (버킷 호스팅)
+
+GitHub Pages 대신 GCP 버킷 자체에 정적 웹사이트를 호스팅하고 싶다면, 제공된 `.github/workflows/deploy-gcp.yml`을 사용할 수 있습니다.
+
+1. GCP에서 정적 웹사이트 호스팅용 버킷을 생성합니다. (예: `www.my-tax-agent.com`)
+2. GitHub Secrets에 다음 변수들을 추가합니다:
+   - `GEMINI_API_KEY`: Vertex AI API 키
+   - `GCP_PROJECT_ID`: GCP 프로젝트 ID
+   - `GCP_SA_KEY`: GCP 서비스 계정 JSON 키 (버킷 쓰기 권한 필요)
+   - `GCP_BUCKET_NAME`: 호스팅할 버킷 이름
+3. `.github/workflows/deploy-gcp.yml` 파일의 주석 처리를 해제하고 Push하면 GCP 버킷으로 자동 배포됩니다.
