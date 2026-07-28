@@ -12,7 +12,6 @@
     "react": "latest",
     "react-dom": "latest",
     "@google/genai": "latest",
-    "@google/generative-ai": "latest", 
     "lucide-react": "latest",
     "marked": "latest",
     "dompurify": "latest"
