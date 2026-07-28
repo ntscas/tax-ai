@@ -1,12 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Scale, MessageSquare, FileText, Send, Loader2, ExternalLink, AlertCircle, Database, Cloud } from 'lucide-react';
+import { Scale, MessageSquare, FileText, Send, Loader2, ExternalLink, AlertCircle, Database } from 'lucide-react';
 import { generateLegalResponse, AgentMode, AgentResponse } from './services/gemini';
 import { MarkdownRenderer } from './components/MarkdownRenderer';
 
 const App: React.FC = () => {
   const [mode, setMode] = useState<AgentMode>('qa');
   const [query, setQuery] = useState('');
-  const [bucketUri, setBucketUri] = useState('gs://ntis-tax-kr/tax_data.pdf');
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<AgentResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +37,7 @@ const App: React.FC = () => {
     setResult(null);
 
     try {
-      const response = await generateLegalResponse(query, mode, bucketUri);
+      const response = await generateLegalResponse(query, mode);
       setResult(response);
     } catch (err: any) {
       setError(err.message || '알 수 없는 오류가 발생했습니다.');
@@ -102,26 +101,6 @@ const App: React.FC = () => {
         {/* Left Panel: Input */}
         <div className="w-full md:w-1/3 flex flex-col space-y-4">
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 flex-grow flex flex-col">
-            
-            {/* GCP Bucket Input */}
-            <div className="mb-5 pb-5 border-b border-gray-100">
-              <label className="block text-sm font-semibold text-gray-800 mb-2 flex items-center">
-                <Cloud className="w-4 h-4 mr-1.5 text-secondary" />
-                GCP 버킷 데이터 연동 (ntis-tax-kr)
-              </label>
-              <input
-                type="text"
-                value={bucketUri}
-                onChange={(e) => setBucketUri(e.target.value)}
-                placeholder="gs://ntis-tax-kr/tax_data.pdf"
-                className="w-full p-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-secondary focus:border-secondary transition-shadow"
-                disabled={isLoading}
-              />
-              <p className="text-xs text-gray-500 mt-2 leading-relaxed">
-                분석에 활용할 GCP 버킷 내 특정 파일(PDF, TXT 등)의 URI를 입력하세요. 비워두면 일반 지식과 검색만 활용합니다.
-              </p>
-            </div>
-
             <h2 className="text-lg font-semibold text-gray-800 mb-2 flex items-center">
               {mode === 'qa' ? '질문 입력' : '사실관계 입력'}
             </h2>
@@ -138,7 +117,7 @@ const App: React.FC = () => {
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder={mode === 'qa' ? "예: 2024년 개정된 종합부동산세 1세대 1주택자 기본공제 금액은 얼마인가요?" : "예: 2023년 5월 1일, 서울시 강남구 소재 아파트를 15억원에 취득하였고..."}
-                className="w-full flex-grow min-h-[150px] p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-secondary focus:border-secondary resize-none transition-shadow text-gray-700"
+                className="w-full flex-grow min-h-[200px] p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-secondary focus:border-secondary resize-none transition-shadow text-gray-700"
                 disabled={isLoading}
               />
               
@@ -171,12 +150,12 @@ const App: React.FC = () => {
           <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
             <h3 className="text-sm font-semibold text-blue-800 mb-2 flex items-center">
               <AlertCircle className="w-4 h-4 mr-1.5" />
-              이용 안내 및 오류 해결
+              이용 안내
             </h3>
             <ul className="text-xs text-blue-700 space-y-1.5 list-disc list-inside">
               <li>본 서비스는 AI가 작성한 초안으로, 법적 효력을 갖지 않습니다.</li>
-              <li><strong>API 오류 발생 시:</strong> GitHub Pages 배포 시 Actions가 정상 실행되었는지, GCP Vertex AI API 키가 맞는지 확인하세요.</li>
-              <li><strong>버킷 오류 발생 시:</strong> 입력한 <code>gs://</code> 경로의 파일이 실제 존재하는지, API 키에 해당 버킷 접근 권한이 있는지 확인하세요.</li>
+              <li>실제 법적 분쟁이나 중요한 의사결정 시에는 반드시 전문 변호사나 세무사와 상담하시기 바랍니다.</li>
+              <li>구글 검색을 통해 최신 법령을 참조하나, 시차에 따른 오류가 있을 수 있습니다.</li>
             </ul>
           </div>
         </div>
@@ -198,7 +177,7 @@ const App: React.FC = () => {
                 <Loader2 className="w-12 h-12 animate-spin" />
                 <div className="text-center">
                   <p className="font-medium text-lg">관련 법령 및 데이터를 분석하고 있습니다...</p>
-                  <p className="text-sm text-gray-500 mt-1">ntis-tax-kr 버킷, 국세청 및 법제처 정보를 검색 중입니다.</p>
+                  <p className="text-sm text-gray-500 mt-1">ntis-tax-kr 및 법제처 정보를 검색 중입니다.</p>
                 </div>
               </div>
             )}
@@ -209,7 +188,7 @@ const App: React.FC = () => {
                   <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 mr-3 flex-shrink-0" />
                   <div>
                     <h3 className="text-sm font-medium text-red-800">오류 발생</h3>
-                    <p className="text-sm text-red-700 mt-1 whitespace-pre-wrap">{error}</p>
+                    <p className="text-sm text-red-700 mt-1">{error}</p>
                   </div>
                 </div>
               </div>
